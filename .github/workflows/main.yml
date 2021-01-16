@@ -23,6 +23,7 @@ jobs:
       RUST_BACKTRACE: 1
     steps:
       - uses: actions/checkout@v2
+      - run: cargo check
       - run: cargo check -p ufmt
       - run: cargo check -p ufmt-utils
       - run: cargo test --features std
