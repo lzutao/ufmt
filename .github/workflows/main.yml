@@ -15,60 +15,37 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
+    env:
+      # RUSTFLAGS: -Ctarget-feature=+crt-static
+      RUST_BACKTRACE: 1
+      MINGW_URL: https://ci-mirrors.rust-lang.org/rustc
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    env:
-      RUST_BACKTRACE: 1
+        target: [x86_64-pc-windows-msvc, i686-pc-windows-msvc, x86_64-pc-windows-gnu, i686-pc-windows-gnu]
+        include:
+          - target: x86_64-pc-windows-gnu
+            archive: x86_64-6.3.0-release-posix-seh-rt_v5-rev2.7z
+            mingw_dir: mingw64
+          - target: i686-pc-windows-gnu
+            archive: i686-6.3.0-release-posix-dwarf-rt_v5-rev2.7z
+            mingw_dir: mingw32
     steps:
       - uses: actions/checkout@v2
+      - run: |
+          rustup toolchain install stable-${{ matrix.target }}
+          rustup default stable-${{ matrix.target }}
+      - name: Check out MinGW toolchain
+        run: |
+          set -x
+          curl -sSf -O "${MINGW_URL}/${{ matrix.archive }}"
+          7z x -y "${{ matrix.archive }}" -o/c/mingw
+          rm "${{ matrix.archive }}"
+          echo "##[add-path]C:\mingw\${{ matrix.mingw_dir }}\bin"
+        shell: bash
+        if: matrix.mingw_dir
       - run: cargo check
       - run: cargo check -p ufmt
       - run: cargo check -p ufmt-utils
       - run: cargo test --features std
       - run: cargo test --manifest-path=macros/Cargo.toml
-
-  rustfmt:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - run: rustup component add rustfmt
-      - run: cargo fmt -- --check
-
-  clippy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - run: |
-          rustup component add clippy
-          rustup target add \
-            x86_64-pc-windows-gnu \
-            x86_64-apple-darwin \
-            x86_64-pc-windows-msvc
-      - run: |
-          for target in x86_64-pc-windows-gnu x86_64-apple-darwin x86_64-pc-windows-msvc; do
-            echo "== checking $target =="
-            cargo check --all-targets --all --target "$target"
-            git ls-files '*lib.rs' | xargs touch
-            # FIXME: Remove `-- -A clippy::option_as_ref_deref` when MSRV is bumped past 1.40.0
-            cargo clippy --all-targets --all --target "$target" \
-              -- \
-              -A clippy::option_as_ref_deref \
-              -A clippy::redundant_field_names
-          done
-        shell: bash
-
-  # These jobs doesn't actually test anything, but they're only used to tell
-  # bors the build completed, as there is no practical way to detect when a
-  # workflow is successful listening to webhooks only.
-  #
-  # ALL THE PREVIOUS JOBS NEED TO BE ADDED TO THE `needs` SECTION OF THIS JOB!
-  end-success:
-    name: bors build finished
-    runs-on: ubuntu-latest
-    needs: [build, rustfmt]
-    if: github.actor == 'bors[bot]' && success()
-    steps:
-      - name: mark the job as a success
-        run: exit 0
