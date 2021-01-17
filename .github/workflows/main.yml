@@ -21,6 +21,7 @@ jobs:
       RUST_BACKTRACE: 1
       MINGW_URL: https://ci-mirrors.rust-lang.org/rustc
     strategy:
+      fail-fast: false
       matrix:
         target: [x86_64-pc-windows-msvc, i686-pc-windows-msvc, x86_64-pc-windows-gnu, i686-pc-windows-gnu]
         include:
@@ -41,7 +42,7 @@ jobs:
           curl -sSf -O "${MINGW_URL}/${{ matrix.archive }}"
           7z x -y "${{ matrix.archive }}" -o/c/mingw
           rm "${{ matrix.archive }}"
-          echo "##[add-path]C:\mingw\${{ matrix.mingw_dir }}\bin"
+          echo "C:\mingw\${{ matrix.mingw_dir }}\bin" >> $GITHUB_PATH
         shell: bash
         if: matrix.mingw_dir
       - run: cargo check
